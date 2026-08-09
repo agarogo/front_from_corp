@@ -9,19 +9,45 @@ export async function GET() {
 
     const response = await fetch(`${BACKEND_URL}/records`, {
       signal: controller.signal,
+      cache: 'no-store',
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: 'Backend returned non-OK status' },
+        { error: `Backend returned status ${response.status}` },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+
+    // Normalize: accept both array and object with records field
+    let records: Record<string, unknown>[];
+    if (Array.isArray(data)) {
+      records = data;
+    } else if (data && typeof data === 'object' && Array.isArray(data.records)) {
+      records = data.records;
+    } else {
+      return NextResponse.json(
+        { error: 'Unexpected response format from backend' },
+        { status: 502 }
+      );
+    }
+
+    // Normalize each entry to LeaderboardEntry shape
+    const normalized = records.map((entry: Record<string, unknown>, index: number) => ({
+      id: (entry.id ?? index),
+      username: String(entry.username ?? 'Anonymous'),
+      score: Number(entry.score ?? 0),
+    }));
+
+    return NextResponse.json(normalized, {
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(
@@ -29,7 +55,7 @@ export async function GET() {
         { status: 504 }
       );
     }
-    
+
     console.error('Failed to fetch records:', error);
     return NextResponse.json(
       { error: 'Failed to fetch records' },

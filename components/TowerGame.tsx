@@ -11,7 +11,7 @@ interface TowerGameProps {
 }
 
 export default function TowerGame({ onGameOver }: TowerGameProps) {
-  const [gameState, setGameState] = useState<GameState>(() => 
+  const [gameState, setGameState] = useState<GameState>(() =>
     resetGame(CONTAINER_WIDTH)
   );
   const animationRef = useRef<number | null>(null);
@@ -52,7 +52,7 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
     }
   }, [gameState.gameOver, gameState.score, onGameOver]);
 
-  // Game loop
+  // Game loop — single RAF loop while running and not game over
   useEffect(() => {
     if (!gameState.running || gameState.gameOver) return;
 
@@ -121,7 +121,7 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
   // Render current sliding block
   const renderCurrentBlock = () => {
     if (!gameState.started || gameState.gameOver) return null;
-    
+
     const lastBlock = gameState.blocks[gameState.blocks.length - 1];
     return (
       <div
@@ -139,7 +139,7 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="text-2xl font-bold text-white">Score: {gameState.score}</div>
-      
+
       <div
         className="relative bg-gray-900 border-2 border-gray-700 rounded-lg overflow-hidden cursor-pointer"
         style={{
@@ -155,24 +155,42 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
       >
         {renderBlocks()}
         {renderCurrentBlock()}
-        
+
         {!gameState.started && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="text-white text-xl font-bold">Click to Start</div>
+            <button
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold rounded-lg transition-colors"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startGame();
+              }}
+            >
+              Start
+            </button>
           </div>
         )}
-        
+
         {gameState.gameOver && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
             <div className="text-center">
               <div className="text-white text-2xl font-bold mb-2">Game Over!</div>
               <div className="text-gray-300 text-lg mb-4">Score: {gameState.score}</div>
-              <div className="text-gray-400">Click to Restart</div>
+              <button
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold rounded-lg transition-colors"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  restartGame();
+                }}
+              >
+                Restart
+              </button>
             </div>
           </div>
         )}
       </div>
-      
+
       <div className="text-gray-400 text-sm">
         Click, tap, or press Space/Enter to drop blocks
       </div>

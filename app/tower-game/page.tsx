@@ -28,7 +28,31 @@ export default function TowerGamePage() {
 
   // Load leaderboard on mount
   useEffect(() => {
-    loadLeaderboard();
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await fetchLeaderboard();
+        if (!cancelled) {
+          setLeaderboard(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError('Failed to load leaderboard');
+          console.error(err);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleGameOver = useCallback((score: number) => {
