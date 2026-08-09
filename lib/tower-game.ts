@@ -47,7 +47,8 @@ export function createInitialState(containerWidth: number): GameState {
 export function tick(state: GameState, containerWidth: number): GameState {
   if (!state.running || state.gameOver) return state;
 
-  let { currentX, direction, speed } = state;
+  let { currentX, direction } = state;
+  const speed = state.speed;
   const blockWidth = state.blocks[state.blocks.length - 1].width;
 
   // Move the sliding block

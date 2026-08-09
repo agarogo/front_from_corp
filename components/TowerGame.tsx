@@ -14,7 +14,7 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
   const [gameState, setGameState] = useState<GameState>(() => 
     resetGame(CONTAINER_WIDTH)
   );
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | null>(null);
   const stateRef = useRef(gameState);
   const gameOverHandledRef = useRef(false);
 
@@ -37,7 +37,7 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
 
   const restartGame = useCallback(() => {
     // Cancel any running animation
-    if (animationRef.current) {
+    if (animationRef.current != null) {
       cancelAnimationFrame(animationRef.current);
     }
     setGameState(resetGame(CONTAINER_WIDTH));
@@ -67,7 +67,7 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
     animationRef.current = requestAnimationFrame(animate);
 
     return () => {
-      if (animationRef.current) {
+      if (animationRef.current != null) {
         cancelAnimationFrame(animationRef.current);
       }
     };
@@ -101,11 +101,6 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
       restartGame();
     }
   }, [gameState.started, gameState.running, gameState.gameOver, startGame, handleDrop, restartGame]);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    handleClick();
-  }, [handleClick]);
 
   // Render blocks
   const renderBlocks = () => {
@@ -153,8 +148,10 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
           maxWidth: '100%',
           aspectRatio: `${CONTAINER_WIDTH}/${CONTAINER_HEIGHT}`,
         }}
-        onClick={handleClick}
-        onTouchStart={handleTouchStart}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          handleClick();
+        }}
       >
         {renderBlocks()}
         {renderCurrentBlock()}
