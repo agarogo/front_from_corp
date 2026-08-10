@@ -1,138 +1,157 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import TowerGame from '@/components/TowerGame';
-import { LeaderboardEntry, fetchLeaderboard, submitScore } from '@/lib/api';
+import { submitScore } from '@/lib/api';
+import Link from 'next/link';
 
 export default function TowerGamePage() {
   const [gameScore, setGameScore] = useState<number | null>(null);
-  const [username, setUsername] = useState('');
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [username, setUsername] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('tower-game-username') || '';
+    }
+    return '';
+  });
+  const [started, setStarted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadLeaderboard = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchLeaderboard();
-      setLeaderboard(data);
-    } catch (err) {
-      setError('Failed to load leaderboard');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  const handleStart = () => {
+    if (!username.trim()) return;
+    localStorage.setItem('tower-game-username', username.trim());
+    setStarted(true);
   };
 
-  // Load leaderboard on mount
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchLeaderboard();
-        if (!cancelled) {
-          setLeaderboard(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError('Failed to load leaderboard');
-          console.error(err);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleGameOver = useCallback((score: number) => {
+  // Auto-save best score on game over
+  const handleGameOver = useCallback(async (score: number) => {
     setGameScore(score);
-  }, []);
 
-  const handleSubmitScore = async () => {
-    if (!username.trim() || !gameScore || gameScore === 0) return;
-
-    try {
-      setSubmitting(true);
-      await submitScore(username.trim(), gameScore);
-      // Refresh leaderboard after successful submission
-      await loadLeaderboard();
-    } catch (err) {
-      setError('Failed to save score');
-      console.error(err);
-    } finally {
-      setSubmitting(false);
+    // Auto-submit if we have a username and score > 0
+    if (username.trim() && score > 0 && !submitting) {
+      try {
+        setSubmitting(true);
+        await submitScore(username.trim(), score);
+      } catch (err) {
+        setError('Failed to save score automatically');
+        console.error(err);
+      } finally {
+        setSubmitting(false);
+      }
     }
+  }, [username, submitting]);
+
+  const handleRestart = () => {
+    setGameScore(null);
+    setError(null);
   };
 
+  // --- Screen: Enter username first ---
+  if (!started) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 text-white flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Tower Stack
+            </h1>
+            <p className="text-gray-400">Stack blocks as high as you can!</p>
+          </div>
+
+          <div className="bg-gray-800/80 backdrop-blur-sm p-6 rounded-2xl shadow-2xl border border-gray-700">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Your Name
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.slice(0, 20))}
+              placeholder="Enter your name..."
+              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+              maxLength={20}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleStart();
+              }}
+            />
+
+            <button
+              onPointerDown={(e) => {
+                e.preventDefault();
+                handleStart();
+              }}
+              disabled={!username.trim()}
+              className="w-full mt-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:transform-none disabled:cursor-not-allowed"
+            >
+              ▶ Start Playing
+            </button>
+
+            <div className="mt-4 text-center">
+              <Link
+                href="/leaderboard"
+                className="text-blue-400 hover:text-blue-300 underline transition-colors"
+              >
+                🏆 View Leaderboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Screen: Game ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 text-white p-4">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-bold text-center mb-8">Tower Stack</h1>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Game Area */}
-          <div className="flex flex-col items-center">
-            <TowerGame onGameOver={handleGameOver} />
-
-            {gameScore !== null && gameScore > 0 && (
-              <div className="mt-6 w-full max-w-md bg-gray-800 p-4 rounded-lg">
-                <h3 className="text-xl font-semibold mb-4">Save Your Score</h3>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.slice(0, 20))}
-                    placeholder="Enter username"
-                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                    maxLength={20}
-                  />
-                  <button
-                    onClick={handleSubmitScore}
-                    disabled={submitting || !username.trim()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded font-semibold transition-colors"
-                  >
-                    {submitting ? 'Saving...' : 'Save'}
-                  </button>
-                </div>
-              </div>
-            )}
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            Tower Stack
+          </h1>
+          <div className="flex gap-3">
+            <Link
+              href="/leaderboard"
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium border border-gray-700"
+            >
+              🏆 Leaderboard
+            </Link>
+            <button
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setStarted(false);
+              }}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium border border-gray-700"
+            >
+              ← Menu
+            </button>
           </div>
+        </div>
 
-          {/* Leaderboard */}
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <h2 className="text-2xl font-bold mb-4">Leaderboard</h2>
+        {/* Game Area */}
+        <div className="flex flex-col items-center">
+          <TowerGame onGameOver={handleGameOver} />
 
-            {loading ? (
-              <div className="text-gray-400">Loading...</div>
-            ) : error ? (
-              <div className="text-red-400">{error}</div>
-            ) : leaderboard.length === 0 ? (
-              <div className="text-gray-400">No scores yet. Be the first!</div>
-            ) : (
-              <div className="space-y-2">
-                {leaderboard.map((entry, index) => (
-                  <div
-                    key={entry.id || index}
-                    className="flex justify-between items-center p-3 bg-gray-700 rounded"
-                  >
-                    <span className="font-semibold">{entry.username}</span>
-                    <span className="text-blue-400 font-bold">{entry.score}</span>
-                  </div>
-                ))}
+          {gameScore !== null && gameScore > 0 && (
+            <div className="mt-6 w-full max-w-md bg-gray-800/80 backdrop-blur-sm p-4 rounded-xl border border-gray-700">
+              <h3 className="text-lg font-semibold mb-2 text-center">
+                {submitting ? 'Saving score...' : 'Game Over!'}
+              </h3>
+              {error && (
+                <p className="text-red-400 text-sm text-center mb-2">{error}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    handleRestart();
+                  }}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-lg font-semibold transition-all"
+                >
+                  Play Again
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

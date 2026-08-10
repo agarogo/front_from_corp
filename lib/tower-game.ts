@@ -1,8 +1,9 @@
 // Tower Stack game engine — pure functions, no React dependencies
+// Tower builds UPWARD (y decreases), camera follows when tower exceeds half screen
 
 export interface Block {
   x: number; // left position relative to container
-  y: number; // top position (increases downward)
+  y: number; // top position (decreases upward — tower builds up)
   width: number;
   height: number;
 }
@@ -16,12 +17,14 @@ export interface GameState {
   running: boolean;
   gameOver: boolean;
   started: boolean;
+  // Camera offset — shifts everything down so tower stays visible
+  cameraY: number;
 }
 
 const BASE_SPEED = 3;
 const SPEED_INCREMENT = 0.15;
 const BLOCK_HEIGHT = 28;
-const INITIAL_WIDTH = 260; // will be set to container width fraction
+const INITIAL_WIDTH = 260;
 
 export function createInitialState(containerWidth: number): GameState {
   const baseBlockWidth = Math.min(INITIAL_WIDTH, containerWidth * 0.7);
@@ -29,7 +32,7 @@ export function createInitialState(containerWidth: number): GameState {
     blocks: [
       {
         x: (containerWidth - baseBlockWidth) / 2,
-        y: 0,
+        y: 0, // base block at bottom of visible area (camera will shift)
         width: baseBlockWidth,
         height: BLOCK_HEIGHT,
       },
@@ -41,6 +44,7 @@ export function createInitialState(containerWidth: number): GameState {
     running: false,
     gameOver: false,
     started: false,
+    cameraY: 0,
   };
 }
 
@@ -83,13 +87,20 @@ export function dropBlock(state: GameState): GameState {
     return { ...state, running: false, gameOver: true };
   }
 
-  // Create trimmed block
+  // Create trimmed block — placed ABOVE the last one (y decreases = builds upward)
   const newBlock: Block = {
     x: overlapStart,
-    y: lastBlock.y + lastBlock.height,
+    y: lastBlock.y - BLOCK_HEIGHT, // negative = above previous block (upward!)
     width: overlapWidth,
     height: BLOCK_HEIGHT,
   };
+
+  // Calculate camera offset so tower stays visible
+  // When the top of the tower goes above half the screen, shift camera down
+  const newCameraY = Math.max(
+    state.cameraY,
+    -newBlock.y - BLOCK_HEIGHT * 12 // keep ~12 blocks visible from top
+  );
 
   // Update currentX to align with the trimmed block for next slide
   const newState: GameState = {
@@ -98,6 +109,7 @@ export function dropBlock(state: GameState): GameState {
     score: state.score + 1,
     speed: state.speed + SPEED_INCREMENT,
     currentX: overlapStart, // start next block at trimmed position
+    cameraY: newCameraY,
   };
 
   return newState;

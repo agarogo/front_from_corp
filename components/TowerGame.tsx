@@ -102,20 +102,35 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
     }
   }, [gameState.started, gameState.running, gameState.gameOver, startGame, handleDrop, restartGame]);
 
-  // Render blocks
+  // Compute the visual offset for rendering blocks with camera follow
+  const cameraY = gameState.cameraY;
+  // Base Y position: bottom of container minus some padding
+  const baseY = CONTAINER_HEIGHT - 60;
+
+  // Render blocks with camera offset
   const renderBlocks = () => {
-    return gameState.blocks.map((block: Block, index: number) => (
-      <div
-        key={index}
-        className="absolute bg-gradient-to-r from-blue-500 to-purple-600 rounded-sm"
-        style={{
-          left: `${(block.x / CONTAINER_WIDTH) * 100}%`,
-          top: `${(block.y / CONTAINER_HEIGHT) * 100}%`,
-          width: `${(block.width / CONTAINER_WIDTH) * 100}%`,
-          height: `${(block.height / CONTAINER_HEIGHT) * 100}%`,
-        }}
-      />
-    ));
+    return gameState.blocks.map((block: Block, index: number) => {
+      // Apply camera offset: block.y is negative (upward), so we add cameraY to shift down
+      const visualY = baseY + block.y + cameraY;
+
+      // Color gradient based on height in tower
+      const hue = Math.max(0, 220 - index * 8);
+
+      return (
+        <div
+          key={index}
+          className="absolute rounded-sm"
+          style={{
+            left: `${(block.x / CONTAINER_WIDTH) * 100}%`,
+            top: `${(visualY / CONTAINER_HEIGHT) * 100}%`,
+            width: `${(block.width / CONTAINER_WIDTH) * 100}%`,
+            height: `${(block.height / CONTAINER_HEIGHT) * 100}%`,
+            background: `linear-gradient(135deg, hsl(${hue}, 70%, 55%), hsl(${hue + 30}, 80%, 45%))`,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          }}
+        />
+      );
+    });
   };
 
   // Render current sliding block
@@ -123,14 +138,19 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
     if (!gameState.started || gameState.gameOver) return null;
 
     const lastBlock = gameState.blocks[gameState.blocks.length - 1];
+    // Sliding block appears above the last placed block
+    const visualY = baseY + (lastBlock.y - 28) + cameraY;
+
     return (
       <div
-        className="absolute bg-gradient-to-r from-green-400 to-blue-500 rounded-sm opacity-80"
+        className="absolute rounded-sm opacity-90"
         style={{
           left: `${(gameState.currentX / CONTAINER_WIDTH) * 100}%`,
-          top: `${(lastBlock.y + lastBlock.height) / CONTAINER_HEIGHT * 100}%`,
+          top: `${(visualY / CONTAINER_HEIGHT) * 100}%`,
           width: `${(lastBlock.width / CONTAINER_WIDTH) * 100}%`,
           height: `${(lastBlock.height / CONTAINER_HEIGHT) * 100}%`,
+          background: 'linear-gradient(135deg, #4ade80, #22d3ee)',
+          boxShadow: '0 0 12px rgba(74, 222, 128, 0.5)',
         }}
       />
     );
@@ -138,53 +158,71 @@ export default function TowerGame({ onGameOver }: TowerGameProps) {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="text-2xl font-bold text-white">Score: {gameState.score}</div>
+      <div className="text-2xl font-bold text-white drop-shadow-lg">
+        Score: {gameState.score}
+      </div>
 
       <div
-        className="relative bg-gray-900 border-2 border-gray-700 rounded-lg overflow-hidden cursor-pointer"
+        className="relative border-2 rounded-xl overflow-hidden cursor-pointer shadow-2xl"
         style={{
           width: `${CONTAINER_WIDTH}px`,
           height: `${CONTAINER_HEIGHT}px`,
           maxWidth: '100%',
           aspectRatio: `${CONTAINER_WIDTH}/${CONTAINER_HEIGHT}`,
+          background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
+          borderColor: '#475569',
         }}
         onPointerDown={(e) => {
           e.preventDefault();
           handleClick();
         }}
       >
+        {/* Ground line */}
+        <div
+          className="absolute w-full"
+          style={{
+            top: `${(baseY + 28) / CONTAINER_HEIGHT * 100}%`,
+            height: '4px',
+            background: 'linear-gradient(90deg, #64748b, #94a3b8, #64748b)',
+          }}
+        />
+
         {renderBlocks()}
         {renderCurrentBlock()}
 
         {!gameState.started && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <button
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold rounded-lg transition-colors"
+              className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white text-xl font-bold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
               onPointerDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 startGame();
               }}
             >
-              Start
+              ▶ Start Game
             </button>
           </div>
         )}
 
         {gameState.gameOver && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
-            <div className="text-center">
-              <div className="text-white text-2xl font-bold mb-2">Game Over!</div>
-              <div className="text-gray-300 text-lg mb-4">Score: {gameState.score}</div>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="text-center p-6">
+              <div className="text-white text-3xl font-bold mb-2 drop-shadow-lg">
+                Game Over!
+              </div>
+              <div className="text-gray-300 text-xl mb-4">
+                Score: {gameState.score}
+              </div>
               <button
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold rounded-lg transition-colors"
+                className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white text-xl font-bold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   restartGame();
                 }}
               >
-                Restart
+                ↻ Play Again
               </button>
             </div>
           </div>
